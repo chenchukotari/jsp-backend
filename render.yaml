@@ -2,9 +2,6 @@ services:
   - type: web
     name: jsp-backend
     runtime: docker
-    dockerfilePath: ./Dockerfile
     envVars:
       - key: DATABASE_URL
         sync: false
-      - key: PORT
-        value: "8080"
