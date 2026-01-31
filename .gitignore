@@ -32,3 +32,13 @@ dist/
 # Testing / typing
 .pytest_cache/
 .mypy_cache/
+
+# Local data and secrets
+data/*.json
+.env.local
+.env.production
+.env.development
+
+# Build artifacts from Docker and CI
+.dockerignore
+render.yaml
