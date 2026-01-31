@@ -17,3 +17,5 @@ node_modules
 .idea
 .vscode
 README.md
+Procfile
+runtime.txt
