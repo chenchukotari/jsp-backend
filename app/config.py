@@ -19,12 +19,17 @@ OCR_SPACE_API_URL = "https://api.ocr.space/parse/image"
 
 # ============ CORS CONFIGURATION ============
 CORS_ORIGINS = [
+    # Local development
     "http://localhost:3000",
     "http://localhost:5173",
     "http://127.0.0.1:3000",
     "http://127.0.0.1:5173",
+    # Vercel deployments
+    "https://*.vercel.app",
+    # Render backend
     "https://aadhaar-backend-uu1u.onrender.com",
-    "*",  # Allow all origins for now
+    # Allow all origins (can be restricted later)
+    "*",
 ]
 
 # ============ SERVER CONFIGURATION ============
