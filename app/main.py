@@ -42,6 +42,15 @@ def save_members(members):
         json.dump(members, f, indent=2, default=str)
 
 
+def _normalize_aadhaar(aadhaar: str) -> str:
+    """Return digits-only 12-digit Aadhaar string or empty string if invalid."""
+    if not aadhaar:
+        return ""
+    digits = re.sub(r"\D", "", aadhaar)
+    return digits if len(digits) == 12 else digits
+
+
+
 # ============ PYDANTIC SCHEMAS ============
 
 class Item(BaseModel):
@@ -231,30 +240,32 @@ async def ocr_parse(file: UploadFile = File(...), apikey: str = Form(None)):
 async def submit_person(payload: PersonSubmitRequest):
     """Save or update member registration from form submission"""
     try:
-        aadhaar = payload.aadhaar_number
+        aadhaar_digits = _normalize_aadhaar(payload.aadhaar_number)
+        if not aadhaar_digits or len(aadhaar_digits) != 12:
+            raise HTTPException(status_code=400, detail="Invalid Aadhaar number")
+
         member_data = payload.dict()
+        member_data["aadhaar_number"] = aadhaar_digits
         member_data["created_at"] = datetime.utcnow().isoformat()
         member_data["updated_at"] = datetime.utcnow().isoformat()
 
         if db.DB_AVAILABLE:
-            # use Postgres
             try:
                 db.insert_or_update_member(member_data)
-                return {"status": "upserted", "member_id": aadhaar, "aadhaar": aadhaar}
+                return {"status": "upserted", "member_id": aadhaar_digits, "aadhaar": aadhaar_digits}
             except Exception as e:
                 raise HTTPException(status_code=500, detail=f"DB error: {e}")
         else:
-            # fallback to file-based storage
             members = load_members()
-            if aadhaar in members:
-                members[aadhaar]["updated_at"] = datetime.utcnow().isoformat()
-                members[aadhaar].update(member_data)
+            if aadhaar_digits in members:
+                members[aadhaar_digits]["updated_at"] = datetime.utcnow().isoformat()
+                members[aadhaar_digits].update(member_data)
                 status = "updated"
             else:
-                members[aadhaar] = member_data
+                members[aadhaar_digits] = member_data
                 status = "created"
             save_members(members)
-            return {"status": status, "member_id": aadhaar, "aadhaar": aadhaar}
+            return {"status": status, "member_id": aadhaar_digits, "aadhaar": aadhaar_digits}
     except HTTPException:
         raise
     except Exception as e:
@@ -264,15 +275,20 @@ async def submit_person(payload: PersonSubmitRequest):
 @app.get("/person/by-aadhaar/{aadhaar}")
 async def get_person_by_aadhaar(aadhaar: str):
     """Lookup member by Aadhaar number"""
+    aadhaar_digits = _normalize_aadhaar(aadhaar)
+    if not aadhaar_digits:
+        raise HTTPException(status_code=400, detail="Invalid Aadhaar number")
+
     if db.DB_AVAILABLE:
-        m = db.get_member(aadhaar)
+        m = db.get_member(aadhaar_digits)
         if not m:
             raise HTTPException(status_code=404, detail="Member not found")
         return m
+
     members = load_members()
-    if aadhaar not in members:
+    if aadhaar_digits not in members:
         raise HTTPException(status_code=404, detail="Member not found")
-    return members[aadhaar]
+    return members[aadhaar_digits]
 
 
 @app.get("/person/list")
@@ -290,6 +306,55 @@ async def list_members(skip: int = 0, limit: int = 100):
         "total": len(all_members),
         "members": paginated
     }
+
+
+@app.get("/person/exists/{aadhaar}")
+async def person_exists(aadhaar: str):
+    """Check whether a person exists for given Aadhaar. Returns exists flag and optional member."""
+    aadhaar_digits = _normalize_aadhaar(aadhaar)
+    if not aadhaar_digits:
+        raise HTTPException(status_code=400, detail="Invalid Aadhaar number")
+
+    if db.DB_AVAILABLE:
+        m = db.get_member(aadhaar_digits)
+        return {"exists": bool(m), "member": m}
+
+    members = load_members()
+    m = members.get(aadhaar_digits)
+    return {"exists": bool(m), "member": m}
+
+
+@app.post("/person/create")
+async def create_person(payload: PersonSubmitRequest):
+    """Create a new person/member only if Aadhaar does not already exist.
+
+    Returns 409 if Aadhaar already exists.
+    """
+    aadhaar_digits = _normalize_aadhaar(payload.aadhaar_number)
+    if not aadhaar_digits or len(aadhaar_digits) != 12:
+        raise HTTPException(status_code=400, detail="Invalid Aadhaar number")
+
+    member_data = payload.dict()
+    member_data["aadhaar_number"] = aadhaar_digits
+    member_data["created_at"] = datetime.utcnow().isoformat()
+    member_data["updated_at"] = datetime.utcnow().isoformat()
+
+    if db.DB_AVAILABLE:
+        existing = db.get_member(aadhaar_digits)
+        if existing:
+            raise HTTPException(status_code=409, detail="This person is already registered as a member.")
+        try:
+            db.insert_or_update_member(member_data)
+            return {"status": "created", "member_id": aadhaar_digits}
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"DB error: {e}")
+
+    members = load_members()
+    if aadhaar_digits in members:
+        raise HTTPException(status_code=409, detail="This person is already registered as a member.")
+    members[aadhaar_digits] = member_data
+    save_members(members)
+    return {"status": "created", "member_id": aadhaar_digits}
 
 
 if __name__ == "__main__":
