@@ -58,6 +58,15 @@ class Item(BaseModel):
     name: str
 
 
+class GeographyResponse(BaseModel):
+    """Geography lookup response"""
+    village_name: str
+    panchayati_name: str | None = None
+    mandal_name: str | None = None
+    constituency_name: str | None = None
+    pincode: str | None = None
+
+
 class PersonSubmitRequest(BaseModel):
     """Form submission payload from UI"""
     aadhaar_number: str
@@ -355,6 +364,30 @@ async def create_person(payload: PersonSubmitRequest):
     members[aadhaar_digits] = member_data
     save_members(members)
     return {"status": "created", "member_id": aadhaar_digits}
+
+
+# ============ GEOGRAPHY LOOKUP ============
+
+@app.get("/geography/lookup/{village_name}", response_model=GeographyResponse)
+async def lookup_geography(village_name: str):
+    """Lookup geography data by village name (case-insensitive).
+    
+    Returns panchayati_name, mandal_name, constituency_name, and pincode.
+    Ward number is NOT returned as multiple wards can exist within the same village.
+    
+    Returns 404 if village not found.
+    """
+    if not village_name or not village_name.strip():
+        raise HTTPException(status_code=400, detail="Village name is required")
+    
+    if not db.DB_AVAILABLE:
+        raise HTTPException(status_code=503, detail="Geography database not available")
+    
+    result = db.lookup_geography(village_name.strip())
+    if not result:
+        raise HTTPException(status_code=404, detail="Village not found in geography database")
+    
+    return result
 
 
 if __name__ == "__main__":

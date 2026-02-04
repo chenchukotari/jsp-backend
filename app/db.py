@@ -107,5 +107,37 @@ def list_members(skip: int = 0, limit: int = 100):
         return [dict(r) for r in rows]
 
 
+def lookup_geography(village_name: str) -> dict | None:
+    """Lookup geography data by village name (case-insensitive).
+    
+    Returns dict with panchayati_name, mandal_name, constituency_name, pincode.
+    Returns None if not found.
+    """
+    if not DB_AVAILABLE or CONN is None:
+        return None
+    
+    try:
+        with CONN.cursor(row_factory=dict_row) as cur:
+            cur.execute(
+                """
+                SELECT 
+                    village_name,
+                    panchayati_name,
+                    mandal_name,
+                    constituency_name,
+                    pincode
+                FROM public.geography
+                WHERE LOWER(village_name) = LOWER(%s)
+                LIMIT 1
+                """,
+                (village_name,)
+            )
+            row = cur.fetchone()
+            return dict(row) if row else None
+    except Exception as e:
+        logger.warning("Geography lookup failed for village '%s': %s", village_name, e)
+        return None
+
+
 # initialize on import
 init_db()
