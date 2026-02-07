@@ -269,7 +269,12 @@ async def submit_person(payload: PersonSubmitRequest):
     try:
         aadhaar_digits = _normalize_aadhaar(payload.aadhaar_number)
         if not aadhaar_digits or len(aadhaar_digits) != 12:
-            raise HTTPException(status_code=400, detail="Invalid Aadhaar number")
+            raise HTTPException(status_code=400, detail="Member Aadhaar must be exactly 12 digits")
+
+        # Validate Nominee Aadhaar
+        nominee_aadhaar_clean = _normalize_aadhaar(payload.nominee_id)
+        if not nominee_aadhaar_clean or len(nominee_aadhaar_clean) != 12:
+            raise HTTPException(status_code=400, detail="Nominee Aadhaar must be exactly 12 digits")
 
         member_data = payload.dict()
         
@@ -288,7 +293,7 @@ async def submit_person(payload: PersonSubmitRequest):
                 # 2. Save Nominee if details provided
                 if payload.nominee_id:
                     nominee_data = {
-                        "aadhaar_number": str(payload.nominee_id).replace(" ", ""),
+                        "aadhaar_number": nominee_aadhaar_clean,
                         "full_name": payload.nominee_full_name,
                         "dob": payload.nominee_dob,
                         "gender": payload.nominee_gender,
@@ -316,17 +321,17 @@ async def submit_person(payload: PersonSubmitRequest):
             
             # Clean and Update Member
             clean_member = {k: v for k, v in member_fields.items() if v is not None and str(v).strip() != ""}
-            if aadhaar in members:
-                was_reg = members[aadhaar].get("is_registered", False)
-                members[aadhaar].update(clean_member)
-                members[aadhaar]["is_registered"] = was_reg or clean_member.get("is_registered", False)
-                members[aadhaar]["updated_at"] = datetime.utcnow().isoformat()
+            if aadhaar_digits in members:
+                was_reg = members[aadhaar_digits].get("is_registered", False)
+                members[aadhaar_digits].update(clean_member)
+                members[aadhaar_digits]["is_registered"] = was_reg or clean_member.get("is_registered", False)
+                members[aadhaar_digits]["updated_at"] = datetime.utcnow().isoformat()
             else:
-                members[aadhaar] = clean_member
+                members[aadhaar_digits] = clean_member
             
             # Clean and Update Nominee
             if payload.nominee_id:
-                nid = str(payload.nominee_id).replace(" ", "")
+                nid = nominee_aadhaar_clean
                 nominee_data = {
                     "aadhaar_number": nid,
                     "full_name": payload.nominee_full_name,
