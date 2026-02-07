@@ -50,8 +50,6 @@ def init_db():
                     aadhaar_image_url text,
                     photo_url text,
                     nominee_id varchar,
-                    nominee_aadhaar_image_url text,
-                    nominee_photo_url text,
                     is_registered boolean DEFAULT false,
                     created_at timestamptz,
                     updated_at timestamptz
@@ -67,16 +65,6 @@ def init_db():
                     IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
                                    WHERE table_name='members' AND column_name='is_registered') THEN
                         ALTER TABLE members ADD COLUMN is_registered boolean DEFAULT false;
-                    END IF;
-                    
-                    IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
-                                   WHERE table_name='members' AND column_name='nominee_aadhaar_image_url') THEN
-                        ALTER TABLE members ADD COLUMN nominee_aadhaar_image_url text;
-                    END IF;
-                    
-                    IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
-                                   WHERE table_name='members' AND column_name='nominee_photo_url') THEN
-                        ALTER TABLE members ADD COLUMN nominee_photo_url text;
                     END IF;
                 END $$;
                 """
@@ -102,8 +90,7 @@ def insert_or_update_member(member: dict):
         "education","profession","religion","reservation","caste",
         "membership","membership_id","constituency","mandal","panchayathi",
         "village","ward_number","latitude","longitude","aadhaar_image_url",
-        "photo_url","nominee_id", "nominee_aadhaar_image_url", "nominee_photo_url",
-        "is_registered","created_at","updated_at"
+        "photo_url","nominee_id","is_registered","created_at","updated_at"
     ]
 
     values = [member.get(c) for c in cols]

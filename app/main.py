@@ -282,9 +282,8 @@ async def submit_person(payload: PersonSubmitRequest):
         member_data = payload.dict()
         
         # Filter out nominee specific fields for the member record
-        # Filter out nominee specific fields for the member record, but keep nominee_id and image links
-        member_fields = {k: v for k, v in member_data.items() 
-                        if not k.startswith("nominee_") or k in ["nominee_id", "nominee_aadhaar_image_url", "nominee_photo_url"]}
+        # Filter out nominee specific fields for the member record
+        member_fields = {k: v for k, v in member_data.items() if not k.startswith("nominee_") or k == "nominee_id"}
         member_fields["created_at"] = datetime.utcnow().isoformat()
         member_fields["updated_at"] = datetime.utcnow().isoformat()
         member_fields["is_registered"] = True  # Mark primary member as registered
