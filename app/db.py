@@ -27,6 +27,7 @@ def init_db():
                 """
                 CREATE TABLE IF NOT EXISTS members (
                     aadhaar_number varchar PRIMARY KEY,
+                    sequence_number SERIAL,
                     full_name text NOT NULL,
                     dob varchar,
                     gender varchar,
@@ -49,9 +50,23 @@ def init_db():
                     aadhaar_image_url text,
                     photo_url text,
                     nominee_id varchar,
+                    is_registered boolean DEFAULT false,
                     created_at timestamptz,
                     updated_at timestamptz
                 )
+                """
+            )
+            
+            # Migration: Ensure is_registered column exists
+            cur.execute(
+                """
+                DO $$ 
+                BEGIN 
+                    IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                                   WHERE table_name='members' AND column_name='is_registered') THEN
+                        ALTER TABLE members ADD COLUMN is_registered boolean DEFAULT false;
+                    END IF;
+                END $$;
                 """
             )
 
@@ -75,18 +90,35 @@ def insert_or_update_member(member: dict):
         "education","profession","religion","reservation","caste",
         "membership","membership_id","constituency","mandal","panchayathi",
         "village","ward_number","latitude","longitude","aadhaar_image_url",
-        "photo_url","nominee_id","created_at","updated_at"
+        "photo_url","nominee_id","is_registered","created_at","updated_at"
     ]
 
     values = [member.get(c) for c in cols]
 
     placeholders = ",".join(["%s"] * len(cols))
-    set_clause = ",".join([f"{c}=EXCLUDED.{c}" for c in cols if c != "aadhaar_number"]) 
+    
+    # On conflict, update fields but preserve existing values if new ones are NULL
+    # Also, NEVER update created_at on conflict.
+    update_cols = [c for c in cols if c not in ["aadhaar_number", "created_at"]]
+    
+    set_clauses = []
+    for c in update_cols:
+        if c == "is_registered":
+            # Once registered (True), always stay registered. Use COALESCE to handle NULLs.
+            set_clauses.append(f"{c}=(COALESCE(members.{c}, false) OR COALESCE(EXCLUDED.{c}, false))")
+        else:
+            set_clauses.append(f"{c}=COALESCE(EXCLUDED.{c}, members.{c})")
+            
+    set_clause = ",".join(set_clauses) 
 
     sql = f"INSERT INTO members ({','.join(cols)}) VALUES ({placeholders}) ON CONFLICT (aadhaar_number) DO UPDATE SET {set_clause};"
 
-    with CONN.cursor() as cur:
-        cur.execute(sql, values)
+    try:
+        with CONN.cursor() as cur:
+            cur.execute(sql, values)
+    except Exception as e:
+        logger.exception("Error executing upsert: %s", e)
+        raise
 
 
 def get_member(aadhaar: str):

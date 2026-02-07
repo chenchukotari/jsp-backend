@@ -1,6 +1,6 @@
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 import os
 import re
 import requests
@@ -96,7 +96,25 @@ class PersonSubmitRequest(BaseModel):
     aadhaar_image_url: str | None = None
     photo_url: str | None = None
     
-    nominee_id: str | None = None
+    # Nominee Details
+    nominee_id: str
+    nominee_full_name: str | None = None
+    nominee_dob: str | None = None
+    nominee_gender: str | None = None
+    nominee_mobile_number: str | None = None
+    nominee_education: str | None = None
+    nominee_profession: str | None = None
+    nominee_religion: str | None = None
+    nominee_reservation: str | None = None
+    nominee_caste: str | None = None
+    nominee_membership: str | None = None
+    nominee_membership_id: str | None = None
+    
+    @field_validator('nominee_id')
+    def nominee_id_not_null(cls, v):
+        if not v or (isinstance(v, str) and v.strip() == ""):
+            raise ValueError("nominee_id cannot be null or empty")
+        return v
 
 
 # ============ BASIC ENDPOINTS ============
@@ -193,7 +211,7 @@ def _extract_fields(parsed_text: str) -> dict:
     for line in lines:
         gm = re.search(r"\b(male|female)\b", line, re.IGNORECASE)
         if gm:
-            gender = gm.group(1).upper()
+            gender = gm.group(1).capitalize()
             break
 
     return {
@@ -254,50 +272,125 @@ async def submit_person(payload: PersonSubmitRequest):
             raise HTTPException(status_code=400, detail="Invalid Aadhaar number")
 
         member_data = payload.dict()
-        member_data["aadhaar_number"] = aadhaar_digits
-        member_data["created_at"] = datetime.utcnow().isoformat()
-        member_data["updated_at"] = datetime.utcnow().isoformat()
+        
+        # Filter out nominee specific fields for the member record
+        member_fields = {k: v for k, v in member_data.items() if not k.startswith("nominee_") or k == "nominee_id"}
+        member_fields["created_at"] = datetime.utcnow().isoformat()
+        member_fields["updated_at"] = datetime.utcnow().isoformat()
+        member_fields["is_registered"] = True  # Mark primary member as registered
 
         if db.DB_AVAILABLE:
             try:
-                db.insert_or_update_member(member_data)
-                return {"status": "upserted", "member_id": aadhaar_digits, "aadhaar": aadhaar_digits}
+                # 1. Save Member (Clean fields to allow COALESCE)
+                clean_member = {k: v for k, v in member_fields.items() if v is not None and str(v).strip() != ""}
+                db.insert_or_update_member(clean_member)
+                
+                # 2. Save Nominee if details provided
+                if payload.nominee_id:
+                    nominee_data = {
+                        "aadhaar_number": str(payload.nominee_id).replace(" ", ""),
+                        "full_name": payload.nominee_full_name,
+                        "dob": payload.nominee_dob,
+                        "gender": payload.nominee_gender,
+                        "mobile_number": payload.nominee_mobile_number,
+                        "education": payload.nominee_education,
+                        "profession": payload.nominee_profession,
+                        "religion": payload.nominee_religion,
+                        "reservation": payload.nominee_reservation,
+                        "caste": payload.nominee_caste,
+                        "membership": payload.nominee_membership,
+                        "membership_id": payload.nominee_membership_id,
+                        "is_registered": False,  # Nominee is not a registered member unless they submit independently
+                        "created_at": datetime.utcnow().isoformat(),
+                        "updated_at": datetime.utcnow().isoformat()
+                    }
+                    clean_nominee = {k: v for k, v in nominee_data.items() if v is not None and str(v).strip() != ""}
+                    if any(v for k, v in clean_nominee.items() if k not in ["aadhaar_number", "created_at", "updated_at", "is_registered"]):
+                        db.insert_or_update_member(clean_nominee)
+
+                return {"status": "upserted", "member_id": aadhaar, "aadhaar": aadhaar}
             except Exception as e:
                 raise HTTPException(status_code=500, detail=f"DB error: {e}")
         else:
             members = load_members()
-            if aadhaar_digits in members:
-                members[aadhaar_digits]["updated_at"] = datetime.utcnow().isoformat()
-                members[aadhaar_digits].update(member_data)
-                status = "updated"
+            
+            # Clean and Update Member
+            clean_member = {k: v for k, v in member_fields.items() if v is not None and str(v).strip() != ""}
+            if aadhaar in members:
+                was_reg = members[aadhaar].get("is_registered", False)
+                members[aadhaar].update(clean_member)
+                members[aadhaar]["is_registered"] = was_reg or clean_member.get("is_registered", False)
+                members[aadhaar]["updated_at"] = datetime.utcnow().isoformat()
             else:
-                members[aadhaar_digits] = member_data
-                status = "created"
+                members[aadhaar] = clean_member
+            
+            # Clean and Update Nominee
+            if payload.nominee_id:
+                nid = str(payload.nominee_id).replace(" ", "")
+                nominee_data = {
+                    "aadhaar_number": nid,
+                    "full_name": payload.nominee_full_name,
+                    "dob": payload.nominee_dob,
+                    "gender": payload.nominee_gender,
+                    "mobile_number": payload.nominee_mobile_number,
+                    "education": payload.nominee_education,
+                    "profession": payload.nominee_profession,
+                    "religion": payload.nominee_religion,
+                    "reservation": payload.nominee_reservation,
+                    "caste": payload.nominee_caste,
+                    "membership": payload.nominee_membership,
+                    "membership_id": payload.nominee_membership_id,
+                    "is_registered": False,
+                    "updated_at": datetime.utcnow().isoformat()
+                }
+                clean_nominee = {k: v for k, v in nominee_data.items() if v is not None and str(v).strip() != ""}
+                if any(v for k, v in clean_nominee.items() if k not in ["aadhaar_number", "updated_at", "is_registered"]):
+                    if nid in members:
+                        was_reg = members[nid].get("is_registered", False)
+                        members[nid].update(clean_nominee)
+                        members[nid]["is_registered"] = was_reg or clean_nominee.get("is_registered", False)
+                    else:
+                        clean_nominee["created_at"] = datetime.utcnow().isoformat()
+                        members[nid] = clean_nominee
+            
             save_members(members)
-            return {"status": status, "member_id": aadhaar_digits, "aadhaar": aadhaar_digits}
+            return {"status": "success", "member_id": aadhaar, "aadhaar": aadhaar}
     except HTTPException:
         raise
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Failed to save member: {str(e)}")
 
 
+@app.get("/person/exists/{aadhaar}")
+async def check_person_exists(aadhaar: str):
+    """Check if person exists and return data for auto-population"""
+    clean_aad = aadhaar.replace(" ", "")
+    m = None
+    if db.DB_AVAILABLE:
+        m = db.get_member(clean_aad)
+    else:
+        members = load_members()
+        m = members.get(clean_aad)
+        
+    if m:
+        return {"exists": True, "member": m}
+    return {"exists": False}
+
+
 @app.get("/person/by-aadhaar/{aadhaar}")
 async def get_person_by_aadhaar(aadhaar: str):
     """Lookup member by Aadhaar number"""
-    aadhaar_digits = _normalize_aadhaar(aadhaar)
-    if not aadhaar_digits:
-        raise HTTPException(status_code=400, detail="Invalid Aadhaar number")
-
+    clean_aad = aadhaar.replace(" ", "")
     if db.DB_AVAILABLE:
-        m = db.get_member(aadhaar_digits)
+        m = db.get_member(clean_aad)
         if not m:
             raise HTTPException(status_code=404, detail="Member not found")
         return m
 
     members = load_members()
-    if aadhaar_digits not in members:
+    if clean_aad not in members:
         raise HTTPException(status_code=404, detail="Member not found")
-    return members[aadhaar_digits]
+    return members[clean_aad]
 
 
 @app.get("/person/list")
