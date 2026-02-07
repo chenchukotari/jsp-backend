@@ -308,7 +308,7 @@ async def submit_person(payload: PersonSubmitRequest):
                     if any(v for k, v in clean_nominee.items() if k not in ["aadhaar_number", "created_at", "updated_at", "is_registered"]):
                         db.insert_or_update_member(clean_nominee)
 
-                return {"status": "upserted", "member_id": aadhaar, "aadhaar": aadhaar}
+                return {"status": "upserted", "member_id": aadhaar_digits, "aadhaar": aadhaar_digits}
             except Exception as e:
                 raise HTTPException(status_code=500, detail=f"DB error: {e}")
         else:
@@ -354,7 +354,7 @@ async def submit_person(payload: PersonSubmitRequest):
                         members[nid] = clean_nominee
             
             save_members(members)
-            return {"status": "success", "member_id": aadhaar, "aadhaar": aadhaar}
+            return {"status": "success", "member_id": aadhaar_digits, "aadhaar": aadhaar_digits}
     except HTTPException:
         raise
     except Exception as e:
