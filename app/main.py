@@ -328,6 +328,11 @@ async def submit_person(payload: PersonSubmitRequest):
             # Clean and Update Member
             clean_member = {k: v for k, v in member_fields.items() if v is not None and str(v).strip() != ""}
             if aadhaar_digits in members:
+                # Purge any legacy nominee fields from the member record
+                for k in list(members[aadhaar_digits].keys()):
+                    if k.startswith("nominee_") and k != "nominee_id":
+                        del members[aadhaar_digits][k]
+                
                 was_reg = members[aadhaar_digits].get("is_registered", False)
                 members[aadhaar_digits].update(clean_member)
                 members[aadhaar_digits]["is_registered"] = was_reg or clean_member.get("is_registered", False)

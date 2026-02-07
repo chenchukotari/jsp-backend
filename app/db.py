@@ -66,6 +66,16 @@ def init_db():
                                    WHERE table_name='members' AND column_name='is_registered') THEN
                         ALTER TABLE members ADD COLUMN is_registered boolean DEFAULT false;
                     END IF;
+
+                    -- Cleanup: Drop nominee-specific columns from member row if they exist
+                    IF EXISTS (SELECT 1 FROM information_schema.columns 
+                               WHERE table_name='members' AND column_name='nominee_aadhaar_image_url') THEN
+                        ALTER TABLE members DROP COLUMN nominee_aadhaar_image_url;
+                    END IF;
+                    IF EXISTS (SELECT 1 FROM information_schema.columns 
+                               WHERE table_name='members' AND column_name='nominee_photo_url') THEN
+                        ALTER TABLE members DROP COLUMN nominee_photo_url;
+                    END IF;
                 END $$;
                 """
             )
