@@ -109,6 +109,8 @@ class PersonSubmitRequest(BaseModel):
     nominee_caste: str | None = None
     nominee_membership: str | None = None
     nominee_membership_id: str | None = None
+    nominee_aadhaar_image_url: str | None = None
+    nominee_photo_url: str | None = None
     
     @field_validator('nominee_id')
     def nominee_id_not_null(cls, v):
@@ -265,6 +267,7 @@ async def ocr_parse(file: UploadFile = File(...), apikey: str = Form(None)):
 
 @app.post("/person/submit")
 async def submit_person(payload: PersonSubmitRequest):
+    print(f"DEBUG: submit_person payload: {payload.dict()}")
     """Save or update member registration from form submission"""
     try:
         aadhaar_digits = _normalize_aadhaar(payload.aadhaar_number)
@@ -279,7 +282,9 @@ async def submit_person(payload: PersonSubmitRequest):
         member_data = payload.dict()
         
         # Filter out nominee specific fields for the member record
-        member_fields = {k: v for k, v in member_data.items() if not k.startswith("nominee_") or k == "nominee_id"}
+        # Filter out nominee specific fields for the member record, but keep nominee_id and image links
+        member_fields = {k: v for k, v in member_data.items() 
+                        if not k.startswith("nominee_") or k in ["nominee_id", "nominee_aadhaar_image_url", "nominee_photo_url"]}
         member_fields["created_at"] = datetime.utcnow().isoformat()
         member_fields["updated_at"] = datetime.utcnow().isoformat()
         member_fields["is_registered"] = True  # Mark primary member as registered
@@ -305,6 +310,8 @@ async def submit_person(payload: PersonSubmitRequest):
                         "caste": payload.nominee_caste,
                         "membership": payload.nominee_membership,
                         "membership_id": payload.nominee_membership_id,
+                        "aadhaar_image_url": payload.nominee_aadhaar_image_url,
+                        "photo_url": payload.nominee_photo_url,
                         "is_registered": False,  # Nominee is not a registered member unless they submit independently
                         "created_at": datetime.utcnow().isoformat(),
                         "updated_at": datetime.utcnow().isoformat()
@@ -345,6 +352,8 @@ async def submit_person(payload: PersonSubmitRequest):
                     "caste": payload.nominee_caste,
                     "membership": payload.nominee_membership,
                     "membership_id": payload.nominee_membership_id,
+                    "aadhaar_image_url": payload.nominee_aadhaar_image_url,
+                    "photo_url": payload.nominee_photo_url,
                     "is_registered": False,
                     "updated_at": datetime.utcnow().isoformat()
                 }
