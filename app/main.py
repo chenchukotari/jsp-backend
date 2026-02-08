@@ -310,10 +310,17 @@ async def submit_person(payload: PersonSubmitRequest):
                         "caste": payload.nominee_caste,
                         "membership": payload.nominee_membership,
                         "membership_id": payload.nominee_membership_id,
+                        "constituency": payload.constituency,
+                        "mandal": payload.mandal,
+                        "panchayathi": payload.panchayathi,
+                        "pincode": payload.pincode,
+                        "village": payload.village,
+                        "ward_number": payload.ward_number,
                         "aadhaar_image_url": payload.nominee_aadhaar_image_url,
                         "photo_url": payload.nominee_photo_url,
                         "is_registered": payload.register_nominee_as_member,
                         "nominee_id": aadhaar_digits if payload.register_nominee_as_member else None,
+                        "nominee_name": payload.full_name if payload.register_nominee_as_member else None,
                         "created_at": datetime.utcnow().isoformat(),
                         "updated_at": datetime.utcnow().isoformat()
                     }
@@ -358,10 +365,17 @@ async def submit_person(payload: PersonSubmitRequest):
                     "caste": payload.nominee_caste,
                     "membership": payload.nominee_membership,
                     "membership_id": payload.nominee_membership_id,
+                    "constituency": payload.constituency,
+                    "mandal": payload.mandal,
+                    "panchayathi": payload.panchayathi,
+                    "pincode": payload.pincode,
+                    "village": payload.village,
+                    "ward_number": payload.ward_number,
                     "aadhaar_image_url": payload.nominee_aadhaar_image_url,
                     "photo_url": payload.nominee_photo_url,
                     "is_registered": payload.register_nominee_as_member,
                     "nominee_id": aadhaar_digits if payload.register_nominee_as_member else None,
+                    "nominee_name": payload.full_name if payload.register_nominee_as_member else None,
                     "updated_at": datetime.utcnow().isoformat()
                 }
                 clean_nominee = {k: v for k, v in nominee_data.items() if v is not None and str(v).strip() != ""}
