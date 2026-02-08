@@ -111,6 +111,7 @@ class PersonSubmitRequest(BaseModel):
     nominee_membership_id: str | None = None
     nominee_aadhaar_image_url: str | None = None
     nominee_photo_url: str | None = None
+    register_nominee_as_member: bool = False
     
     @field_validator('nominee_id')
     def nominee_id_not_null(cls, v):
@@ -311,7 +312,8 @@ async def submit_person(payload: PersonSubmitRequest):
                         "membership_id": payload.nominee_membership_id,
                         "aadhaar_image_url": payload.nominee_aadhaar_image_url,
                         "photo_url": payload.nominee_photo_url,
-                        "is_registered": False,  # Nominee is not a registered member unless they submit independently
+                        "is_registered": payload.register_nominee_as_member,
+                        "nominee_id": aadhaar_digits if payload.register_nominee_as_member else None,
                         "created_at": datetime.utcnow().isoformat(),
                         "updated_at": datetime.utcnow().isoformat()
                     }
@@ -358,7 +360,8 @@ async def submit_person(payload: PersonSubmitRequest):
                     "membership_id": payload.nominee_membership_id,
                     "aadhaar_image_url": payload.nominee_aadhaar_image_url,
                     "photo_url": payload.nominee_photo_url,
-                    "is_registered": False,
+                    "is_registered": payload.register_nominee_as_member,
+                    "nominee_id": aadhaar_digits if payload.register_nominee_as_member else None,
                     "updated_at": datetime.utcnow().isoformat()
                 }
                 clean_nominee = {k: v for k, v in nominee_data.items() if v is not None and str(v).strip() != ""}
