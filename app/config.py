@@ -10,7 +10,7 @@ import os
 # by setting the `DATABASE_URL` environment variable locally or in Render.
 DATABASE_URL = os.getenv(
     "DATABASE_URL",
-    "postgresql://jsp_user:yjIu8kiTIHxCXN7fZIsOiChPTa5lNtmD@dpg-d5uuor4oud1c7384pf50-a.oregon-postgres.render.com/jsp_db"
+    "postgresql://jsp_user1:7IyP2bkgISSChdUKPRMbyeUO0uO3dI6V@dpg-d6ipmdfkijhs738ajm6g-a/jsp1"
 )
 
 # ============ OCR CONFIGURATION ============
