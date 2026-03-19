@@ -52,6 +52,8 @@ def init_db():
                     nominee_id varchar,
                     nominee_name text,
                     is_registered boolean DEFAULT false,
+                    filled_by text,
+                    filled_by_mobile varchar,
                     created_at timestamptz,
                     updated_at timestamptz
                 )
@@ -81,6 +83,11 @@ def init_db():
                                    WHERE table_name='members' AND column_name='nominee_name') THEN
                         ALTER TABLE members ADD COLUMN nominee_name text;
                     END IF;
+                    IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                                   WHERE table_name='members' AND column_name='filled_by') THEN
+                        ALTER TABLE members ADD COLUMN filled_by text;
+                        ALTER TABLE members ADD COLUMN filled_by_mobile varchar;
+                    END IF;
                 END $$;
                 """
             )
@@ -105,7 +112,8 @@ def insert_or_update_member(member: dict):
         "education","profession","religion","reservation","caste",
         "membership","membership_id","constituency","mandal","panchayathi",
         "village","ward_number","latitude","longitude","aadhaar_image_url",
-        "photo_url","nominee_id","nominee_name","is_registered","created_at","updated_at"
+        "photo_url","nominee_id","nominee_name","is_registered",
+        "filled_by", "filled_by_mobile", "created_at","updated_at"
     ]
 
     values = [member.get(c) for c in cols]

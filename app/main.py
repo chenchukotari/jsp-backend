@@ -82,6 +82,9 @@ class PersonSubmitRequest(BaseModel):
     reservation: str | None = None
     caste: str | None = None
     
+    filled_by: str | None = None
+    filled_by_mobile: str | None = None
+    
     membership: str | None = None
     membership_id: str | None = None
     
